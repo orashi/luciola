@@ -10,6 +10,8 @@ import urllib.request
 
 import feedparser
 
+from app.settings import settings
+
 
 @dataclass
 class FeedCandidate:
@@ -22,6 +24,16 @@ _DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
     "Accept": "application/rss+xml, application/xml, text/xml, application/json;q=0.9, */*;q=0.1",
 }
+
+
+def _open_url(req: urllib.request.Request, timeout: int):
+    proxy = (settings.rss_proxy_url or "").strip()
+    if not proxy:
+        return urllib.request.urlopen(req, timeout=timeout)
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+    )
+    return opener.open(req, timeout=timeout)
 
 
 def _normalize_url(href: str) -> str:
@@ -67,7 +79,7 @@ def _resolve_bangumi_magnet(link: str) -> str | None:
     api = f"https://bangumi.moe/api/v2/torrent/{tid}"
     req = urllib.request.Request(api, headers={**_DEFAULT_HEADERS, "Accept": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=20) as r:
+        with _open_url(req, timeout=20) as r:
             obj = json.loads(r.read().decode())
         mg = obj.get("magnet")
         return mg if isinstance(mg, str) and mg.startswith("magnet:") else None
@@ -87,7 +99,7 @@ def resolve_download_link(link: str) -> str:
 
 def _parse_feed_url(url: str, timeout_sec: int = 12):
     req = urllib.request.Request(url, headers=_DEFAULT_HEADERS)
-    with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+    with _open_url(req, timeout=timeout_sec) as resp:
         data = resp.read()
     return feedparser.parse(data)
 
@@ -177,7 +189,7 @@ def fetch_bangumi_api_candidates(
         url = f"https://bangumi.moe/api/v2/torrent/page/{page}"
         req = urllib.request.Request(url, headers={**_DEFAULT_HEADERS, "Accept": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=per_call_timeout) as r:
+            with _open_url(req, timeout=per_call_timeout) as r:
                 obj = json.loads(r.read().decode())
         except Exception:
             continue

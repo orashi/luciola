@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     library_root: str = "/media/library/Anime"
     preferred_subgroups: str = ""
     rss_urls: str = ""
+    # Optional outbound proxy for RSS/API fetches (e.g. http://127.0.0.1:7890)
+    rss_proxy_url: str = ""
     backfill_limit_per_show: int = 200
 
     # Poll safety + source expansion limits
