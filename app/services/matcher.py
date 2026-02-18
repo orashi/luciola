@@ -24,13 +24,45 @@ def extract_season_no(title: str) -> int | None:
     return None
 
 
+def extract_episode_range(title: str) -> tuple[int, int] | None:
+    patterns = [
+        r"\b(?:E|EP)?\s*0?(\d{1,3})\s*[-~]\s*(?:E|EP)?\s*0?(\d{1,3})\b",
+        r"\[\s*0?(\d{1,3})\s*[-~]\s*0?(\d{1,3})\s*\]",
+        r"第\s*0?(\d{1,3})\s*[-~]\s*0?(\d{1,3})\s*[话話集]",
+    ]
+    for pat in patterns:
+        m = re.search(pat, title, re.IGNORECASE)
+        if not m:
+            continue
+        start = int(m.group(1))
+        end = int(m.group(2))
+        if 1 <= start <= 300 and 1 <= end <= 300:
+            lo, hi = sorted((start, end))
+            if lo != hi:
+                return lo, hi
+    return None
+
+
+def _season_token_spans(title: str) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    patterns = [
+        r"\bS(?:EASON)?\s*0?[1-9]\d?\b",
+        r"\b[1-9]\d?(?:st|nd|rd|th)\s+season\b",
+        r"第\s*0?[1-9]\d?\s*[季期]",
+    ]
+    for pat in patterns:
+        for m in re.finditer(pat, title, re.IGNORECASE):
+            spans.append(m.span())
+    return spans
+
+
 def extract_episode_no(title: str) -> int | None:
     # Common explicit forms first: S01E03 / EP03 / 第3话 / 第03集
     patterns = [
         r"\bS\d{1,2}E(\d{1,3})\b",
-        r"\b(?:E|EP)\s?0?(\d{1,3})\b",
+        r"\b(?:E|EP)[\s._-]?0?(\d{1,3})\b",
         r"第\s?0?(\d{1,3})\s?[话話集]",
-        r"(?:\[|\s|-)0?(\d{1,3})(?:v\d+)?(?:\]|\s|$)",
+        r"\[\s*0?(\d{1,3})(?:v\d+)?\s*\]",
     ]
     for pat in patterns:
         m = re.search(pat, title, re.IGNORECASE)
@@ -41,8 +73,10 @@ def extract_episode_no(title: str) -> int | None:
                 return ep
 
     # Last resort: standalone number, excluding common non-episode numbers.
-    # Avoid accidental matches like 1080p, x265, 10bit, years, etc.
+    # Avoid accidental matches like 1080p, x265, years, season-only markers, etc.
     bad_numbers = {264, 265, 480, 540, 576, 720, 1080, 1440, 2160}
+    season_spans = _season_token_spans(title)
+
     for m in re.finditer(r"\b(\d{1,4})\b", title):
         n = int(m.group(1))
         if n in bad_numbers:
@@ -50,8 +84,15 @@ def extract_episode_no(title: str) -> int | None:
         if 1900 <= n <= 2100:  # likely year
             continue
         # Reject episode 0 and out-of-range
-        if 1 <= n <= 300:
-            return n
+        if not (1 <= n <= 300):
+            continue
+
+        # Skip numbers that are part of season-only tokens (e.g. "S02", "Season 2").
+        start, end = m.span()
+        if any(ss <= start and end <= se for ss, se in season_spans):
+            continue
+
+        return n
     return None
 
 

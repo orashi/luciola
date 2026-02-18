@@ -7,7 +7,13 @@ from urllib.parse import quote
 from sqlmodel import Session, select
 
 from app.models.entities import Episode, Release, Show, ShowAlias, ShowProfile
-from app.services.matcher import extract_episode_no, extract_season_no, is_bad_release, score_release
+from app.services.matcher import (
+    extract_episode_no,
+    extract_episode_range,
+    extract_season_no,
+    is_bad_release,
+    score_release,
+)
 from app.services.qbit_client import add_magnet
 from app.services.rss_sources import (
     fetch_bangumi_api_candidates,
@@ -122,6 +128,12 @@ def poll_and_enqueue(session: Session, only_show_ids: set[int] | None = None) ->
         if not wanted_eps and first_sync and show.total_eps:
             wanted_eps = [ep for ep in range(1, int(show.total_eps) + 1) if ep not in set(downloaded)]
 
+        # Skip shows that are already complete unless we have explicit
+        # backlog states (aired/missing) that need refill.
+        is_complete = bool(show.total_eps and len(downloaded) >= int(show.total_eps))
+        if is_complete and not wanted_eps:
+            continue
+
         alias_rows = session.exec(select(ShowAlias).where(ShowAlias.show_id == show.id)).all()
         aliases = [show.title_input, show.title_canonical, *[a.alias for a in alias_rows]]
         expected_season = _infer_expected_season(aliases)
@@ -197,15 +209,23 @@ def poll_and_enqueue(session: Session, only_show_ids: set[int] | None = None) ->
             if is_bad_release(c.title):
                 continue
             raw_ep = extract_episode_no(c.title)
+            batch_range = extract_episode_range(c.title)
             parsed_season = extract_season_no(c.title)
             if expected_season and parsed_season and parsed_season != expected_season:
                 continue
+
+            # Batch packs like "01-13" should still be actionable for backfill.
+            parsed_ep = raw_ep
+            if batch_range and wanted_eps:
+                lo, hi = batch_range
+                overlap = [ep for ep in wanted_eps if lo <= ep <= hi]
+                if overlap:
+                    parsed_ep = overlap[0]
 
             # Apply episode offset: convert absolute fansub numbering to
             # season-relative.  e.g. torrent "EP 51" with ep_offset=48 → EP 3.
             # Only apply when raw ep is above the show's episode range —
             # some fansubs already use per-season numbering.
-            parsed_ep = raw_ep
             if parsed_ep and ep_offset > 0 and show.total_eps:
                 max_season_ep = int(show.total_eps)
                 if parsed_ep > max_season_ep:

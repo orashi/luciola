@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from sqlmodel import Session, select
 
 from app.db import engine
-from app.models.entities import Episode, Release
+from app.models.entities import Episode, Release, Show
 from app.services.qbit_client import get_client
 from app.settings import settings
 
@@ -30,6 +30,10 @@ def _container_to_host_path(path_str: str) -> str:
     return path_str
 
 
+def _normalize_path(path_str: str) -> str:
+    return (path_str or "").rstrip("/").lower()
+
+
 def cleanup_stalled(max_age_minutes: int = 20) -> dict:
     client = get_client()
     infos = client.torrents_info(limit=500)
@@ -38,6 +42,17 @@ def cleanup_stalled(max_age_minutes: int = 20) -> dict:
 
     remove_hashes: list[str] = []
     active_hashes: set[str] = set()
+
+    with Session(engine) as s:
+        downloaded_counts: dict[int, int] = {}
+        for ep in s.exec(select(Episode).where(Episode.state == "downloaded")).all():
+            downloaded_counts[ep.show_id] = downloaded_counts.get(ep.show_id, 0) + 1
+
+        complete_show_save_paths = {
+            _normalize_path(f"{settings.qbit_save_root.rstrip('/')}/{show.title_canonical}")
+            for show in s.exec(select(Show)).all()
+            if show.total_eps and downloaded_counts.get(show.id, 0) >= int(show.total_eps)
+        }
 
     active_titles = [str(getattr(t, "name", "") or "").lower() for t in infos]
 
@@ -50,6 +65,16 @@ def cleanup_stalled(max_age_minutes: int = 20) -> dict:
         progress = float(getattr(t, "progress", 0.0) or 0.0)
         added_on = int(getattr(t, "added_on", now) or now)
         age = now - added_on
+
+        # Guardrail: if the show path is already complete, remove active
+        # queued/downloading torrents under that path to prevent false-positive churn.
+        save_path = str(getattr(t, "save_path", "") or "")
+        save_path_norm = _normalize_path(save_path)
+        if state in {"queuedDL", "downloading", "stalledDL", "metaDL", "forcedDL"} and any(
+            save_path_norm == p or save_path_norm.startswith(p + "/") for p in complete_show_save_paths
+        ):
+            remove_hashes.append(t.hash)
+            continue
 
         # Immediate cleanup for known hard-broken qB state.
         if state == "missingFiles":
