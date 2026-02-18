@@ -1,92 +1,81 @@
-# Bangumi Automation (uv-based)
+# luciola
 
-Personal automation stack for tracking releases, downloading via qBittorrent, organizing files, and notifying via Telegram.
+Delta-first Bangumi monitor, reconcile, and notifier.
 
-## 1) Environment policy
-This project uses **uv** for Python env + deps.
+`luciola` tracks episode releases, coordinates qBittorrent downloads, reconciles media into your library, and supports Jellyfin refresh workflows.
 
-## 2) Quick start
+## What it does
+
+- Track shows + episode state (`planned` / `aired` / `downloaded`)
+- Poll RSS/search sources for release candidates
+- Add download tasks to qBittorrent
+- Reconcile completed media into library layout
+- Trigger Jellyfin refresh when needed
+- Expose API endpoints for automation (OpenClaw, cron, scripts)
+
+## Stack
+
+- Python + FastAPI
+- SQLModel / SQLite
+- qBittorrent Web API
+- Jellyfin API (optional but recommended)
+- `uv` for Python dependency/env management
+
+## Quick start (local)
+
 ```bash
 cd bangumi-automation
 cp .env.example .env
-# edit .env values
+# edit .env with your real values
 
 uv sync
-uv run uvicorn app.main:app --reload --port 8787
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8787
 ```
 
 Health check:
+
 ```bash
 curl http://127.0.0.1:8787/health
 ```
 
-## 3) Docker stack
+## Docker
+
 ```bash
 docker compose up -d
 ```
 
-Services:
-- qBittorrent: http://localhost:8080
-- Jellyfin: http://localhost:8096
-- App API: http://localhost:8787
+Default service ports:
 
-## 4) Current API (agent-orchestrated mode)
-- `POST /api/intake` upsert show(s) with aliases/profile (intended to be called by OpenClaw)
-- `POST /api/shows` simple add for manual testing
-- `GET /api/shows` list tracked shows
-- `GET /api/shows/{id}/status` show download progress
-- `POST /api/jobs/poll-now` run immediate RSS poll + enqueue
-- `POST /api/jobs/reconcile-now` scan incoming files and organize into library
-- `POST /api/jobs/sync-now` poll + reconcile in one call
+- qBittorrent WebUI: `8080`
+- Jellyfin: `8096`
+- App API: `8787`
 
-Example intake:
-```bash
-curl -X POST http://127.0.0.1:8787/api/intake \
-  -H 'content-type: application/json' \
-  -d '{
-    "shows": [
-      {
-        "title": "葬送のフリーレン",
-        "canonical_title": "Sousou no Frieren",
-        "total_eps": 28,
-        "aliases": ["Frieren", "葬送的芙莉莲", "そうそうのフリーレン"],
-        "preferred_subgroups": ["喵萌奶茶屋"],
-        "min_score": 75
-      }
-    ]
-  }'
+> For public/remote deployments, lock down exposure via firewall/reverse proxy/VPN.
 
-curl -X POST http://127.0.0.1:8787/api/jobs/sync-now
-```
+## Core API endpoints
 
-## 5) Next implementation tasks
-- [x] Add source adapters (RSS-based)
-- [ ] Add bangumi.moe query/search adapter (not only RSS)
-- [ ] Add metadata provider client (Bangumi API + fallback)
-- [ ] Wire qBittorrent completion callback → organizer + mark Episode downloaded
-- [ ] Telegram commands: /add /status /latest /pause
-- [ ] Per-show subgroup/quality profile
+- `POST /api/intake` — upsert show metadata/aliases/profile
+- `POST /api/shows` — add a show manually
+- `GET /api/shows` — list tracked shows
+- `GET /api/shows/{id}/status` — show progress/status
+- `POST /api/jobs/poll-now` — poll sources and enqueue downloads
+- `POST /api/jobs/reconcile-now` — reconcile downloaded media into library
+- `POST /api/jobs/sync-now` — metadata sync + poll + reconcile flow
+- `POST /api/jobs/jellyfin-refresh-now` — trigger Jellyfin refresh
 
-## 5) Suggested cron/scheduler cadence
-- Poll releases: every 15 min
-- Verify missing episodes: every 6 hours
-- Library reconcile: daily at 03:00
+## Security
 
-## 6) SMB/Jellyfin NAS-like access
-- Share `/media/library` via SMB for other PCs
-- Use Jellyfin for browser/mobile streaming
+Read [SECURITY.md](./SECURITY.md) before deployment or contribution.
 
-## 7) Health checks
-One-time qB setup (save path + category):
-```bash
-uv run python scripts/configure_qbit.py
-```
+Key rules:
 
-Run health check:
-```bash
-./scripts/healthcheck.sh
-```
-Checks:
-- app `/health` endpoint
-- qB API auth
-- qB save path/category
+- Never commit real secrets (`.env`, tokens, passwords)
+- Keep runtime state out of git (`data/`, caches, logs)
+- Use strong credentials and least-privilege tokens
+- Re-run security scans before public push
+
+## Project docs
+
+- Operations defaults: [OPERATIONS.md](./OPERATIONS.md)
+- Pipeline runbook: [docs/PIPELINE_RUNBOOK.md](./docs/PIPELINE_RUNBOOK.md)
+- Codex autopilot workflow: [docs/CODEX_AUTOPILOT.md](./docs/CODEX_AUTOPILOT.md)

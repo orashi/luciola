@@ -23,10 +23,10 @@ Use focused windows around expected release times + subtitle lag, not 24/7 polli
 6. Return `NO_REPLY` when no change
 
 ## Dedupe
-Persist per-episode notification state in workspace memory file to avoid repeat alerts.
-Recommended path:
+Persist per-episode notification state in a local state file to avoid repeat alerts.
+Recommended path pattern:
 
-`/home/orashi/.openclaw/workspace/memory/bangumi-episode-reminder-state.json`
+`./state/bangumi-episode-reminder-state.json`
 
 ## Cost baseline
 Default model for routine cron loops:
