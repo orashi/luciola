@@ -6,6 +6,7 @@ from app.db import engine, get_session
 from app.models.entities import Episode, Show, ShowAlias, ShowProfile
 from app.services.anime_db import sync_authentic_anime_info
 from app.services.job_runner import job_runner
+from app.services.jellyfin import TrackedShow, collect_jellyfin_status
 from app.services.pipeline import poll_and_enqueue
 from app.services.qbit_maintenance import cleanup_stalled
 from app.services.qbit_client import get_client
@@ -249,6 +250,14 @@ def recovery_now(session: Session = Depends(get_session)):
     rec = reconcile_library(session)  # also deletes invalid files
     poll = poll_and_enqueue(session)  # immediately refill replacements
     return {"ok": True, "sync": sync, "reconcile": rec, "poll": poll}
+
+
+@router.get("/jobs/jellyfin-status-now")
+def jellyfin_status_now(session: Session = Depends(get_session)):
+    shows = session.exec(select(Show).order_by(Show.id)).all()
+    tracked = [TrackedShow(id=int(show.id or 0), title_canonical=show.title_canonical) for show in shows]
+    items = collect_jellyfin_status(tracked)
+    return {"ok": True, "items": items, "count": len(items)}
 
 
 @router.post("/jobs/jellyfin-refresh-now")
