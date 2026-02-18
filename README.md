@@ -1,32 +1,39 @@
 # luciola
 
-Delta-first Bangumi monitor, reconcile, and notifier.
+<p align="center">
+  <img src="assets/logo/luciola-logo-candidate-03.png" alt="luciola logo" width="220" />
+</p>
 
-`luciola` tracks episode releases, coordinates qBittorrent downloads, reconciles media into your library, and supports Jellyfin refresh workflows.
+<p align="center">
+  <strong>Delta-first Bangumi monitor, reconcile loop, and notifier.</strong>
+</p>
 
-## What it does
+<p align="center">
+  <a href="https://github.com/orashi/luciola/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/orashi/luciola/ci.yml?branch=main&label=ci"></a>
+  <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-blue">
+  <img alt="Package manager" src="https://img.shields.io/badge/env-uv-7c3aed">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
+</p>
 
-- Track shows + episode state (`planned` / `aired` / `downloaded`)
-- Poll RSS/search sources for release candidates
-- Add download tasks to qBittorrent
-- Reconcile completed media into library layout
-- Trigger Jellyfin refresh when needed
-- Expose API endpoints for automation (OpenClaw, cron, scripts)
+`luciola` tracks episode releases, coordinates qBittorrent downloads, reconciles media into library layout, and supports Jellyfin refresh workflows.
 
-## Stack
+---
 
-- Python + FastAPI
-- SQLModel / SQLite
-- qBittorrent Web API
-- Jellyfin API (optional but recommended)
-- `uv` for Python dependency/env management
+## Features
+
+- Episode state tracking (`planned` / `aired` / `downloaded`)
+- RSS/search polling with season-aware matching
+- qBittorrent enqueue + maintenance operations
+- Reconcile completed media into library structure
+- Jellyfin refresh trigger endpoint
+- API-first design for OpenClaw/cron automation
 
 ## Quick start (local)
 
 ```bash
 cd bangumi-automation
 cp .env.example .env
-# edit .env with your real values
+# edit .env with real values
 
 uv sync
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8787
@@ -44,38 +51,56 @@ curl http://127.0.0.1:8787/health
 docker compose up -d
 ```
 
-Default service ports:
+Default ports:
 
 - qBittorrent WebUI: `8080`
 - Jellyfin: `8096`
 - App API: `8787`
 
-> For public/remote deployments, lock down exposure via firewall/reverse proxy/VPN.
+> For remote/public environments, place services behind firewall/VPN/reverse proxy.
 
-## Core API endpoints
+## API endpoints (core)
 
-- `POST /api/intake` — upsert show metadata/aliases/profile
+- `POST /api/intake` — upsert shows + aliases/profile
 - `POST /api/shows` — add a show manually
 - `GET /api/shows` — list tracked shows
-- `GET /api/shows/{id}/status` — show progress/status
-- `POST /api/jobs/poll-now` — poll sources and enqueue downloads
-- `POST /api/jobs/reconcile-now` — reconcile downloaded media into library
-- `POST /api/jobs/sync-now` — metadata sync + poll + reconcile flow
+- `GET /api/shows/{id}/status` — progress/status
+- `POST /api/jobs/poll-now` — poll + enqueue
+- `POST /api/jobs/reconcile-now` — reconcile library
+- `POST /api/jobs/sync-now` — metadata sync + poll + reconcile
 - `POST /api/jobs/jellyfin-refresh-now` — trigger Jellyfin refresh
 
-## Security
+## Project layout
 
-Read [SECURITY.md](./SECURITY.md) before deployment or contribution.
+```text
+app/                    FastAPI app + services
+docs/                   Runbooks and architecture
+scripts/                Ops utilities
+tests/                  Test suite
+docker-compose.yml      Local stack
+```
 
-Key rules:
+## Documentation
 
-- Never commit real secrets (`.env`, tokens, passwords)
-- Keep runtime state out of git (`data/`, caches, logs)
-- Use strong credentials and least-privilege tokens
-- Re-run security scans before public push
-
-## Project docs
-
+- Security policy: [SECURITY.md](./SECURITY.md)
 - Operations defaults: [OPERATIONS.md](./OPERATIONS.md)
 - Pipeline runbook: [docs/PIPELINE_RUNBOOK.md](./docs/PIPELINE_RUNBOOK.md)
-- Codex autopilot workflow: [docs/CODEX_AUTOPILOT.md](./docs/CODEX_AUTOPILOT.md)
+- Architecture: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- Codex workflow: [docs/CODEX_AUTOPILOT.md](./docs/CODEX_AUTOPILOT.md)
+
+## Brand assets
+
+Current logo candidates:
+- `assets/logo/luciola-logo-candidate-03.png`
+- `assets/logo/luciola-logo-candidate-04.png`
+
+## Security baseline
+
+- Do **not** commit `.env` or real credentials
+- Keep runtime state out of git (`data/`, caches, logs)
+- Prefer least-privilege tokens and rotate credentials periodically
+- Re-run secret/static scans before public pushes
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

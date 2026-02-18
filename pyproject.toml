@@ -1,7 +1,7 @@
 [project]
-name = "bangumi-automation"
-version = "0.1.0"
-description = "Bangumi automation service (tracking, torrenting, organizing, notifications)"
+name = "luciola"
+version = "0.2.0"
+description = "Delta-first Bangumi monitor, downloader reconcile loop, and notifier"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",
