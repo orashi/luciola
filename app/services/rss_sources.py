@@ -46,13 +46,19 @@ def _normalize_url(href: str) -> str:
 
 
 def _pick_link(entry) -> str | None:
-    # Prefer magnet link if available
+    # Prefer explicit magnet link if available.
     for l in entry.get("links", []) or []:
         href = l.get("href", "")
         if href.startswith("magnet:"):
             return href
 
-    # Prefer torrent enclosure URL over entry page URL
+    # Nyaa RSS exposes infohash in `nyaa_infohash`; synthesize magnet so qB
+    # can fetch via DHT/trackers instead of relying on direct .torrent URL fetch.
+    infohash = (entry.get("nyaa_infohash") or "").strip().lower()
+    if re.fullmatch(r"[a-f0-9]{40}", infohash):
+        return f"magnet:?xt=urn:btih:{infohash}"
+
+    # Prefer torrent enclosure URL over entry page URL.
     for l in entry.get("links", []) or []:
         href = l.get("href", "")
         typ = (l.get("type") or "").lower()
