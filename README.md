@@ -83,6 +83,7 @@ docker-compose.yml      Local stack
 ## Documentation
 
 - Security policy: [SECURITY.md](./SECURITY.md)
+- Contributing guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
 - Operations defaults: [OPERATIONS.md](./OPERATIONS.md)
 - Pipeline runbook: [docs/PIPELINE_RUNBOOK.md](./docs/PIPELINE_RUNBOOK.md)
 - Architecture: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)

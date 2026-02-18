@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MSG_FILE="$1"
+MSG="$(cat "$MSG_FILE")"
+SUBJECT="$(printf "%s" "$MSG" | head -n1)"
+
+# Block personal/chat-style addressing in commit subjects.
+if printf "%s" "$SUBJECT" | grep -Eiq '\b(doctor|dear|sir|madam|bro|buddy)\b'; then
+  echo "❌ Commit message subject contains personal addressing."
+  echo "   Use neutral, repo-scoped wording (e.g. 'brand: adopt selected luciola logo')."
+  exit 1
+fi
+
+# Encourage concise conventional-ish subject line.
+if [ ${#SUBJECT} -gt 72 ]; then
+  echo "❌ Commit message subject too long (${#SUBJECT} > 72)."
+  exit 1
+fi
