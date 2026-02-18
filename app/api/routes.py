@@ -150,15 +150,20 @@ def show_status(show_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="show not found")
 
     eps = session.exec(select(Episode).where(Episode.show_id == show_id)).all()
-    downloaded = sorted(e.ep_no for e in eps if e.state == "downloaded")
-    latest = downloaded[-1] if downloaded else None
-    complete = bool(show.total_eps and latest and latest >= show.total_eps)
+    downloaded_eps = sorted({e.ep_no for e in eps if e.state == "downloaded"})
+    downloaded_count = len(downloaded_eps)
+    latest = downloaded_eps[-1] if downloaded_eps else None
+
+    total_eps = show.total_eps
+    complete = bool(total_eps and downloaded_count >= total_eps)
+    missing_count = max(total_eps - downloaded_count, 0) if total_eps else None
 
     return {
         "show": show,
         "latest_downloaded_ep": latest,
-        "downloaded_count": len(downloaded),
-        "total_eps": show.total_eps,
+        "downloaded_count": downloaded_count,
+        "total_eps": total_eps,
+        "missing_count": missing_count,
         "complete": complete,
     }
 
