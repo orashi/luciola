@@ -1,7 +1,7 @@
 # luciola
 
 <p align="center">
-  <img src="assets/logo/luciola-logo-candidate-03.png" alt="luciola logo" width="220" />
+  <img src="assets/logo/luciola-logo-layout-01.png" alt="luciola logo" width="320" />
 </p>
 
 <p align="center">
@@ -91,8 +91,11 @@ docker-compose.yml      Local stack
 ## Brand assets
 
 Current logo candidates:
-- `assets/logo/luciola-logo-candidate-03.png`
-- `assets/logo/luciola-logo-candidate-04.png`
+- `assets/logo/luciola-logo-layout-01.png` (wordmark main + side companion)
+- `assets/logo/luciola-logo-layout-02.png` (wordmark main + side companion)
+- `assets/logo/luciola-logo-layout-03.png` (all-caps variant)
+- `assets/logo/luciola-logo-candidate-03-transparent.png` (icon-only transparent fixed)
+- `assets/logo/luciola-logo-candidate-04-transparent.png` (icon-only transparent fixed)
 
 ## Security baseline
 
