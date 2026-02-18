@@ -6,7 +6,12 @@ from app.db import engine, get_session
 from app.models.entities import Episode, Show, ShowAlias, ShowProfile
 from app.services.anime_db import sync_authentic_anime_info
 from app.services.job_runner import job_runner
-from app.services.jellyfin import TrackedShow, collect_jellyfin_status
+from app.services.jellyfin import (
+    TrackedShow,
+    collect_jellyfin_status,
+    heal_jellyfin_season_order,
+    infer_season_number,
+)
 from app.services.pipeline import poll_and_enqueue
 from app.services.qbit_maintenance import cleanup_stalled
 from app.services.qbit_client import get_client
@@ -20,6 +25,17 @@ router = APIRouter()
 def _run_poll_show(show_id: int):
     with Session(engine) as session:
         return poll_and_enqueue(session, only_show_ids={show_id})
+
+
+def _run_jellyfin_heal_order(session: Session) -> dict:
+    shows = session.exec(select(Show).order_by(Show.id)).all()
+    tracked = [TrackedShow(id=int(show.id or 0), title_canonical=show.title_canonical) for show in shows]
+    seasons = {
+        int(show.id or 0): infer_season_number(show.title_canonical)
+        for show in shows
+    }
+    items = heal_jellyfin_season_order(tracked, seasons)
+    return {"ok": True, "items": items, "count": len(items)}
 
 
 class AddShowReq(BaseModel):
@@ -218,7 +234,29 @@ def task_cancel(job_id: str):
 
 @router.post("/jobs/reconcile-now")
 def reconcile_now(session: Session = Depends(get_session)):
-    return reconcile_library(session)
+    out = reconcile_library(session)
+    summary = {"checked": 0, "healed_shows": 0, "remaining_null_index": 0}
+
+    if int(out.get("moved") or 0) > 0:
+        try:
+            heal = _run_jellyfin_heal_order(session)
+            items = heal.get("items") if isinstance(heal, dict) else []
+            if not isinstance(items, list):
+                items = []
+            summary = {
+                "checked": len(items),
+                "healed_shows": sum(1 for row in items if isinstance(row, dict) and row.get("healed")),
+                "remaining_null_index": sum(
+                    int((row.get("after_null_index") or 0))
+                    for row in items
+                    if isinstance(row, dict)
+                ),
+            }
+        except Exception:
+            pass
+
+    out["jellyfin_heal"] = summary
+    return out
 
 
 @router.post("/jobs/sync-metadata-now")
@@ -263,6 +301,11 @@ def jellyfin_status_now(session: Session = Depends(get_session)):
     tracked = [TrackedShow(id=int(show.id or 0), title_canonical=show.title_canonical) for show in shows]
     items = collect_jellyfin_status(tracked)
     return {"ok": True, "items": items, "count": len(items)}
+
+
+@router.post("/jobs/jellyfin-heal-order-now")
+def jellyfin_heal_order_now(session: Session = Depends(get_session)):
+    return _run_jellyfin_heal_order(session)
 
 
 @router.post("/jobs/jellyfin-refresh-now")
