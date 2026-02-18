@@ -1,0 +1,49 @@
+services:
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Shanghai
+      - WEBUI_PORT=8080
+      - WEBUI_USER=${QBIT_USERNAME}
+      - WEBUI_PASS=${QBIT_PASSWORD}
+    volumes:
+      - ./data/qbittorrent/config:/config
+      - /media/incoming:/downloads
+    ports:
+      - "8080:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./data/jellyfin/config:/config
+      - ./data/jellyfin/cache:/cache
+      - /media/library:/media
+    ports:
+      - "8096:8096"
+    restart: unless-stopped
+
+  app:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm
+    container_name: bangumi-automation-app
+    working_dir: /workspace
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8787"]
+    env_file:
+      - .env
+    volumes:
+      - ./:/workspace
+      - /media/incoming:/media/incoming
+      - /media/library:/media/library
+    ports:
+      - "8787:8787"
+    depends_on:
+      - qbittorrent
+    restart: unless-stopped
