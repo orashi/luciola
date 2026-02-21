@@ -15,6 +15,7 @@ from app.services.matcher import (
     score_release,
 )
 from app.services.qbit_client import add_magnet
+from app.services.qbit_maintenance import cleanup_stalled
 from app.services.rss_sources import (
     fetch_bangumi_api_candidates,
     fetch_candidates,
@@ -95,6 +96,14 @@ def _infer_expected_season(aliases: list[str]) -> int | None:
 
 
 def poll_and_enqueue(session: Session, only_show_ids: set[int] | None = None) -> dict:
+    # Preflight: clean stale qB/release rows so "ghost queued" records do not
+    # block re-enqueue for aired episodes when qB no longer has the torrent.
+    try:
+        cleanup_stalled(max_age_minutes=10)
+    except Exception:
+        # Non-fatal: polling should continue even if maintenance has an issue.
+        pass
+
     feed_urls = _feed_urls()
     if not feed_urls:
         return {"ok": False, "reason": "no_rss_urls"}
