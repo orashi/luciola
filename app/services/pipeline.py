@@ -99,7 +99,9 @@ def poll_and_enqueue(session: Session, only_show_ids: set[int] | None = None) ->
     # Preflight: clean stale qB/release rows so "ghost queued" records do not
     # block re-enqueue for aired episodes when qB no longer has the torrent.
     try:
-        cleanup_stalled(max_age_minutes=10)
+        # Short preflight window to quickly recover from ghost queued rows
+        # that can block aired episode re-enqueue.
+        cleanup_stalled(max_age_minutes=5)
     except Exception:
         # Non-fatal: polling should continue even if maintenance has an issue.
         pass

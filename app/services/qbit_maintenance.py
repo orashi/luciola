@@ -131,10 +131,20 @@ def cleanup_stalled(max_age_minutes: int = 20) -> dict:
                 removed += 1
 
         # 2) Prune stale release rows not present in qB anymore.
-        stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=max_age_minutes * 2)
+        now_utc = datetime.now(timezone.utc)
+        stale_cutoff = now_utc - timedelta(minutes=max_age_minutes * 2)
         rows = s.exec(select(Release)).all()
         for r in list(rows):
-            if not r.created_at or r.created_at.replace(tzinfo=timezone.utc) >= stale_cutoff:
+            if not r.created_at:
+                continue
+
+            created = r.created_at
+            created_utc = created if created.tzinfo else created.replace(tzinfo=timezone.utc)
+
+            # Guard against timezone-misaligned naive timestamps (observed in the wild):
+            # if created_at appears too far in the future, do NOT protect it with cutoff.
+            # We still verify qB presence below before pruning.
+            if created_utc >= stale_cutoff and created_utc <= (now_utc + timedelta(minutes=5)):
                 continue
 
             link = r.magnet_or_torrent or ""
