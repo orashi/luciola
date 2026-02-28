@@ -126,6 +126,39 @@ def test_find_series_by_title_does_not_match_different_show(monkeypatch):
     assert found is None
 
 
+def test_find_series_by_title_falls_back_to_series_list_for_normalized_match(monkeypatch):
+    client = jellyfin.JellyfinClient(host="127.0.0.1", port=8096, api_key="test-key")
+    calls = []
+
+    def _fake_get_json(self, path, params):
+        calls.append((path, params))
+        if len(calls) == 1:
+            return {"Items": []}
+        return {"Items": [{"Id": "series-2", "Name": "Fate - strange Fake"}]}
+
+    monkeypatch.setattr(jellyfin.JellyfinClient, "_get_json", _fake_get_json)
+
+    found = client.find_series_by_title("Fate/strange Fake")
+    assert found is not None
+    assert found["Id"] == "series-2"
+    assert len(calls) == 2
+    assert calls[0][0] == "/Items"
+    assert calls[0][1] == {
+        "IncludeItemTypes": "Series",
+        "Recursive": "true",
+        "SearchTerm": "Fate/strange Fake",
+        "Limit": "10",
+        "Fields": "SortName",
+    }
+    assert calls[1][0] == "/Items"
+    assert calls[1][1] == {
+        "IncludeItemTypes": "Series",
+        "Recursive": "true",
+        "Limit": "200",
+        "Fields": "SortName",
+    }
+
+
 def test_get_season_null_index_numbers_filters_by_season(monkeypatch):
     client = jellyfin.JellyfinClient(host="127.0.0.1", port=8096, api_key="test-key")
 

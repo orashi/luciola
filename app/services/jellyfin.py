@@ -108,6 +108,32 @@ class JellyfinClient:
         return f"{self.base_url}{path}"
 
     def find_series_by_title(self, title: str) -> dict[str, Any] | None:
+        normalized_query = _normalize_series_title(title)
+        casefold_query = title.strip().casefold()
+
+        def _match_items(items: Any) -> dict[str, Any] | None:
+            if not isinstance(items, list):
+                return None
+
+            exact = [
+                item
+                for item in items
+                if isinstance(item, dict)
+                and str(item.get("Name", "")).strip().casefold() == casefold_query
+            ]
+            if exact:
+                return exact[0]
+
+            normalized = [
+                item
+                for item in items
+                if isinstance(item, dict)
+                and _normalize_series_title(str(item.get("Name", ""))) == normalized_query
+            ]
+            if normalized:
+                return normalized[0]
+            return None
+
         data = self._get_json(
             "/Items",
             {
@@ -118,33 +144,20 @@ class JellyfinClient:
                 "Fields": "SortName",
             },
         )
-        items = data.get("Items")
-        if not isinstance(items, list):
-            return None
+        matched = _match_items(data.get("Items"))
+        if matched:
+            return matched
 
-        exact = [
-            item
-            for item in items
-            if isinstance(item, dict)
-            and str(item.get("Name", "")).strip().casefold() == title.strip().casefold()
-        ]
-        if exact:
-            return exact[0]
-
-        normalized_query = _normalize_series_title(title)
-        normalized = [
-            item
-            for item in items
-            if isinstance(item, dict)
-            and _normalize_series_title(str(item.get("Name", ""))) == normalized_query
-        ]
-        if normalized:
-            return normalized[0]
-
-        for item in items:
-            if isinstance(item, dict):
-                break
-        return None
+        fallback_data = self._get_json(
+            "/Items",
+            {
+                "IncludeItemTypes": "Series",
+                "Recursive": "true",
+                "Limit": "200",
+                "Fields": "SortName",
+            },
+        )
+        return _match_items(fallback_data.get("Items"))
 
     def get_series_episode_stats(self, series_id: str) -> tuple[int, int]:
         items = self.get_series_episodes(series_id)
