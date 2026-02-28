@@ -93,6 +93,39 @@ def test_collect_jellyfin_status_counts_unknown_season(monkeypatch):
     ]
 
 
+def test_find_series_by_title_matches_with_normalized_titles(monkeypatch):
+    client = jellyfin.JellyfinClient(host="127.0.0.1", port=8096, api_key="test-key")
+    cases = [
+        ("Fate/strange Fake", "Fate - strange Fake"),
+        ("Sousou no Frieren Season 2", "Sousou no Frieren"),
+        ("New PANTY & STOCKING with GARTERBELT Season 2", "New PANTY & STOCKING with GARTERBELT"),
+    ]
+
+    for query, jellyfin_name in cases:
+        monkeypatch.setattr(
+            jellyfin.JellyfinClient,
+            "_get_json",
+            lambda self, _path, _params, jellyfin_name=jellyfin_name: {
+                "Items": [{"Id": "series-1", "Name": jellyfin_name}]
+            },
+        )
+        found = client.find_series_by_title(query)
+        assert found is not None
+        assert found["Name"] == jellyfin_name
+
+
+def test_find_series_by_title_does_not_match_different_show(monkeypatch):
+    client = jellyfin.JellyfinClient(host="127.0.0.1", port=8096, api_key="test-key")
+    monkeypatch.setattr(
+        jellyfin.JellyfinClient,
+        "_get_json",
+        lambda self, _path, _params: {"Items": [{"Id": "series-1", "Name": "Fate Zero"}]},
+    )
+
+    found = client.find_series_by_title("Fate/strange Fake")
+    assert found is None
+
+
 def test_get_season_null_index_numbers_filters_by_season(monkeypatch):
     client = jellyfin.JellyfinClient(host="127.0.0.1", port=8096, api_key="test-key")
 

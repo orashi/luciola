@@ -14,6 +14,16 @@ class TrackedShow:
     title_canonical: str
 
 
+def _normalize_series_title(title: str) -> str:
+    x = title.casefold().strip()
+    x = re.sub(r"[^\w\s\u4e00-\u9fff]+", " ", x)
+    x = re.sub(r"\s+", " ", x).strip()
+    x = re.sub(r"\s+\d{1,2}(?:st|nd|rd|th)\s+season$", "", x)
+    x = re.sub(r"\s+(?:season|s)\s*0*([1-9]\d?)$", "", x)
+    x = re.sub(r"\s+第\s*0*([1-9]\d?)\s*[季期]$", "", x)
+    return x.strip()
+
+
 def infer_season_number(title: str) -> int:
     m = re.search(r"(?:season|s)\s*([1-9]\d?)", title, re.IGNORECASE)
     if m:
@@ -121,9 +131,19 @@ class JellyfinClient:
         if exact:
             return exact[0]
 
+        normalized_query = _normalize_series_title(title)
+        normalized = [
+            item
+            for item in items
+            if isinstance(item, dict)
+            and _normalize_series_title(str(item.get("Name", ""))) == normalized_query
+        ]
+        if normalized:
+            return normalized[0]
+
         for item in items:
             if isinstance(item, dict):
-                return item
+                break
         return None
 
     def get_series_episode_stats(self, series_id: str) -> tuple[int, int]:
